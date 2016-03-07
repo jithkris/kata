@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/qunit/1.18.0/qunit.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/qunit/1.18.0/qunit.min.css" type="text/css" media="screen">
+<body onload="isExactChangeOnly()">
+<script>
+
+var currentStatus = "INSERT COIN";
+
+var currentAmount = 0;
+var balance = 0;
+var insertedCoins = [];
+var returnedCoins = [];
+var coinInventory = {
+	NICKEL : 1,
+	DIME : 1,
+	QUARTER : 1
+
+};
+var coinDesc = {
+	//made up weight and diameter
+	"{ weight: 1, diameter: 2 }" : "PENNY",
+	"{ weight: 2, diameter: 3 }" : "NICKEL",
+	"{ weight: 3, diameter: 4 }" : "DIME",
+	"{ weight: 4, diameter: 5 }" : "QUARTER"
+
+};
+var coinType = {
+	PENNY : ".01",
+	NICKEL : ".05",
+	DIME : ".10",
+	QUARTER : ".25"
+
+};
+var stock = {
+	coke : 1,
+	chips : 2,
+	candy : 2
+};
+function isExactChangeOnly() {
+	if (coinInventory["DIME"] == 0 && coinInventory["NICKEL"] ==0) {
+		currentStatus = "EXACT CHANGE ONLY";
+		updateDisplay(currentStatus);
+		return "EXACT CHANGE ONLY";
+	} else {
+		currentStatus = "INSERT COIN";
+		updateDisplay(currentStatus);
+		return "INSERT COIN";
+	}
+}
+function isSoldOut(p1) {
+	if (stock[p1] == 0) {
+		currentStatus = "SOLD OUT";
+		updateDisplay(currentStatus)
+		window.setTimeout(refreshDisplay, 5000);
+		return true;
+	} else
+		return false;
+}
+function returnCoins() {
+	currentAmount = updateInventoryAndMakeChange(currentAmount);
+	document.getElementById("rejectedCoins").innerHTML = insertedCoins;
+	isExactChangeOnly();
+}
+function updateDisplay(status) {
+	document.getElementById("currentDisplay").innerHTML = status;
+}
+function refreshDisplay() {
+	if (insertedCoins == "") {
+		isExactChangeOnly();
+
+	} else {
+		currentStatus = currentAmount;
+		updateDisplay(currentStatus);
+	}
+}
+function acceptCoins(coinDescription) {
+	if (coinDescription == ""){
+		alert("Insert dimension and press add");
+        return;
+        }
+	coinInserted = coinType[coinDesc[coinDescription]];
+	// validation for exact change, invalid coins are not added
+	if (returnedCoins == "" && balance == 0)
+		document.getElementById("rejectedCoins").innerHTML = "";
+
+	if (coinInserted == coinType.PENNY) {
+		// add to rejected coin array
+		returnedCoins.push(coinInserted);
+		document.getElementById("rejectedCoins").innerHTML = returnedCoins;
+		document.getElementById("inputCoin").value = "";
+		return "invalid coin";
+	} else {
+		insertedCoins.push(coinInserted);
+		coinInventory[coinDesc[coinDescription]] += 1;
+		// alert(coinInventory[coinDesc[coinDescription]]);
+		currentAmount = currentAmount + Number(coinInserted);
+		currentStatus = currentAmount;
+		currentStatus = currentAmount.toFixed(2);
+		updateDisplay(currentStatus)
+	}
+	return currentAmount;
+
+}
+
+function buyProduct(product, price) {
+	var isSoldOuts = isSoldOut(product);
+	if (isSoldOuts)
+		return currentStatus;
+
+	if (price <= currentAmount) {
+		currentStatus = "THANK YOU";
+		updateDisplay(currentStatus);
+		balance = currentAmount - price;
+		updateInventoryAndMakeChange(balance.toFixed(2));
+		currentAmount = 0;
+		document.getElementById("rejectedCoins").innerHTML = returnedCoins;
+		balance = 0;
+		returnedCoins = [];
+		insertedCoins = [];
+		stock[product] = stock[product] - 1;
+		window.setTimeout(refreshDisplay, 1000);
+	} else {
+		currentStatus = "PRICE " + price;
+		updateDisplay(currentStatus);
+	}
+}
+function updateInventoryAndMakeChange(amount) {
+	while (amount > 0) {
+		if (amount >= .25) {
+			returnedCoins.push(.25);
+			coinInventory["QUARTER"] -= 1;
+			amount = (amount * 100 - .25 * 100) / 100;
+			continue;
+		}
+		if (amount >= .10) {
+			returnedCoins.push(.10);
+			coinInventory["DIME"] -= 1;
+			amount = (amount * 100 - .10 * 100) / 100;
+			continue;
+		}
+		if (amount >= .05) {
+			returnedCoins.push(.05);
+			coinInventory["NICKEL"] -= 1;
+			amount = (amount * 100 - .05 * 100) / 100;
+			continue;
+		}
+	}
+	return amount;
+}
+//Uncomment below to view the test results
+/**
+QUnit.test('Accepting coins', function(assert) {
+	currentAmount = 0;
+	stock.coke = 1;
+	returnedCoins = [];
+	assert.ok(currentStatus == "INSERT COIN", 'Testing initial display');
+	acceptCoins("{ weight: 2, diameter: 3 }");
+	assert.ok(currentAmount == .05, 'Nickel added');
+	acceptCoins("{ weight: 3, diameter: 4 }");
+	assert.ok(currentAmount.toFixed(2) == .15, 'Nickel added');
+	assert.strictEqual(acceptCoins("{ weight: 1, diameter: 2 }"),
+			"invalid coin", 'Penny rejected');
+
+});
+QUnit.test('Selecting Product', function(assert) {
+	currentAmount = .65;
+	buyProduct('chips', .5);
+	assert.ok(balance == 0, 'Balance is zero after purchase');
+	assert.ok(currentAmount == 0, 'currentamount is zero after purchase');
+	currentAmount = .45;
+	buyProduct('chips', .5);
+	assert.ok(currentAmount == .45, 'Unable to purchase, insufficient amount');
+});
+QUnit.test('Make change', function(assert) {
+	// passing the amount to get the change
+	updateInventoryAndMakeChange(.65);
+	assert.ok(returnedCoins == "0.25,0.25,0.1,0.05",
+			'Change returned for the given amount');
+});
+QUnit.test('Return Coins', function(assert) {
+	returnedCoins = [];
+	currentAmount = .50;
+	returnCoins();
+	assert.ok(returnedCoins == "0.25,0.25",
+			'Change returned for the given amount');
+});
+QUnit.test('Sold out', function(assert) {
+	returnedCoins = [];
+	stock.coke = 0;
+	currentAmount = 1;
+	status = isSoldOut("coke");
+	assert.ok(status == "true", 'Coke Sold out');
+	stock.coke = 1;
+	currentAmount = 1;
+	status = isSoldOut("coke");
+	assert.ok(status == "false", 'Coke available now');
+});
+
+QUnit.test('Exact change', function(assert) {
+	returnedCoins = [];
+	coinInventory.DIME = 0;
+	status = isExactChangeOnly();
+	assert.ok(status == "EXACT CHANGE ONLY", 'Exact change not available');
+	coinInventory.DIME = 1;
+	status = isExactChangeOnly();
+	assert.ok(status == "INSERT COIN", 'Exact change available now');
+});
+**/
+</script>
+<div >"{ weight: 1, diameter: 2 }" : "PENNY"</div>
+<div >"{ weight: 2, diameter: 3 }" : "NICKEL"</div>
+<div >"{ weight: 3, diameter: 4 }" : "DIME"</div>
+<div >"{ weight: 4, diameter: 5 }" : "QUARTER"</div>
+<p>Validation has been added only for Penny.Please input only the valid weight and diameter</p>
+<p>Qunit test classes are commented out while testing the vending machine, as it exists in the same file.Uncomment and load the same file to view QUnit test results</p>
+<p>All functionalities has been implemented, along with test classes</p>
+<input id="inputCoin" type="text" value="{ weight: 4, diameter: 5 }"></input>
+<button id="buttonText" onclick="acceptCoins(document.getElementById('inputCoin').value)">ADD</button>
+<button id="colaSelected" onclick="buyProduct('coke',1)">cola for $1.00</button>
+<button id="chipsSelected" onclick="buyProduct('chips',.5)">chips for $0.50</button>
+<button id="candySelected" onclick="buyProduct('candy',.65)">candy for $0.65</button>
+
+<p id="currentDisplay">INSERT COIN</p>
+<button id="candySelected" onclick="returnCoins()">Return Coins</button>
+Coin Return: <span id="rejectedCoins"></span>
+
+    <h1 id="qunit-header">QUnit Test Suite</h1>
+    <h2 id="qunit-banner"></h2>
+    <ol id="qunit-tests"></ol>
+
+
+</body>
+</html>
